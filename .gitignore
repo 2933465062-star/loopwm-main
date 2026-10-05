@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 环境
+.venv/
+venv/
+env/
+
+# 数据与模型产物
+*.pt
+*.json
+!README.md
+
+# IDE
+.vscode/
+.idea/
+
+# 系统
+Thumbs.db
+.DS_Store
+
+# 论文PDF（版权属于原作者，不建议上传）
+loopwm_paper.pdf
