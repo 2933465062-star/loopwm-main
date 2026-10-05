@@ -22,11 +22,9 @@ class RecurrentDynamicsCore(nn.Module):
         # 动作嵌入（与词嵌入同维度，供融合使用）
         self.act_proj = nn.Linear(action_dim, hidden_dim, bias=False)
 
-        # 前向循环单元（GRU 风格）
-        self.fwd_gru = nn.GRUCell(hidden_dim, hidden_dim)
-
-        # 反向回溯单元（同一组参数复用，实现参数共享的双向循环）
-        self.bwd_gru = nn.GRUCell(hidden_dim, hidden_dim)
+        # 循环单元（GRU 风格）：前向与反向共用同一组参数，
+        # 通过"一个 cell 在两条通路复用"实现参数共享的双向循环
+        self.gru = nn.GRUCell(hidden_dim, hidden_dim)
 
         # 软门控融合网络
         self.gate_fc = nn.Linear(hidden_dim * 2, hidden_dim)
@@ -56,13 +54,13 @@ class RecurrentDynamicsCore(nn.Module):
         a = self.act_proj(act_emb)  # [B, H]
 
         # ---- 前向循环通路 ----
-        h_f = self.fwd_gru(obs_emb + a)
+        h_f = self.gru(obs_emb + a)
 
-        # ---- 反向回溯通路 ----
+        # ---- 反向回溯通路（复用同一个循环单元，参数共享）----
         if state_emb is None:
             h_b = torch.zeros_like(h_f)
         else:
-            h_b = self.bwd_gru(state_emb + a)
+            h_b = self.gru(state_emb + a)
 
         # ---- 软门控融合 ----
         gate = self.gate_act(self.gate_fc(torch.cat([h_f, h_b], dim=-1)))

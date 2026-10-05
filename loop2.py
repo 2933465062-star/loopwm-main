@@ -98,6 +98,7 @@ def main():
     print("Epoch     Loss   ValMSE CosSim   Time")
     print("---------------------------------------------")
 
+    import random as _rnd
     for epoch in range(EPOCHS):
         t0 = time.time()
         model.train()
@@ -110,9 +111,15 @@ def main():
 
             with torch.no_grad():
                 model.eval()
+                # 目标状态嵌入：由固定编码器计算（不参与本步梯度，非端到端）
                 next_emb = model.encode(next_ids)
                 model.train()
-            pred_emb, act_logits, _, _ = model(obs_ids, act_ids=act_ids)
+            # 自适应深度：训练时随机采样迭代次数（1~5，近似泊松）
+            num_iters = max(1, min(5, _rnd.randint(1, 5)))
+            # 关键：以 next_emb 作为目标状态激活反向回溯通路（state_emb != None）
+            pred_emb, act_logits, _, _ = model(obs_ids, act_ids=act_ids,
+                                               state_emb=next_emb,
+                                               num_iters=num_iters)
 
             loss_mse = mse(pred_emb, next_emb)
             loss_act = ce(act_logits, act_ids)
@@ -135,7 +142,8 @@ def main():
                 act_ids = batch["act_ids"].to(DEVICE)
                 next_ids = batch["next_ids"].to(DEVICE)
                 next_emb = model.encode(next_ids)
-                pred_emb, _, _, _ = model(obs_ids, act_ids=act_ids)
+                pred_emb, _, _, _ = model(obs_ids, act_ids=act_ids,
+                                          state_emb=next_emb)
                 val_mse += mse(pred_emb, next_emb).item()
                 cos = nn.functional.cosine_similarity(pred_emb, next_emb, dim=-1).mean().item()
                 cos_sim += cos

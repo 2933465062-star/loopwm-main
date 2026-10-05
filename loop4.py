@@ -122,8 +122,12 @@ def main():
         t = transitions[idx]
         obs_ids = torch.tensor([tokenize(t["obs_text"], w2i)], dtype=torch.long, device=DEVICE)
         act_ids = torch.tensor([a2i.get(t["action_str"], 0)], dtype=torch.long, device=DEVICE)
+        next_ids = torch.tensor([tokenize(t["next_obs_text"], w2i)], dtype=torch.long, device=DEVICE)
         with torch.no_grad():
-            pred_emb, act_logits, _, _ = model(obs_ids, act_ids=act_ids)
+            # 以 next_emb 作为目标状态，激活反向回溯通路（与训练协议一致）
+            next_emb = model.encode(next_ids)
+            pred_emb, act_logits, _, _ = model(obs_ids, act_ids=act_ids,
+                                               state_emb=next_emb)
         pred_text = retrieve_text(pred_emb, data, model, w2i)
         ref_text = t["next_obs_text"]
 
